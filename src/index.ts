@@ -658,7 +658,7 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
         spos -= ofc;
         cbt = spos >> 3;
         const ofp = 1 << ofc;
-        let off = ofp + (((dat[cbt] | (dat[cbt + 1] << 8) | (dat[cbt + 2] << 16) | (dat[cbt + 3] << 24)) >>> (spos & 7)) & (ofp - 1));
+        let off = ofp + (((dat[cbt] | (dat[cbt + 1] << 8) | (dat[cbt + 2] << 16) | (dat[cbt + 3] << 24)) >> (spos & 7)) & (ofp - 1));
         spos -= mlb[mlc];
         cbt = spos >> 3;
         let ml = mlbl[mlc] + (((dat[cbt] | (dat[cbt + 1] << 8) | (dat[cbt + 2] << 16)) >> (spos & 7)) & ((1 << mlb[mlc]) - 1));
