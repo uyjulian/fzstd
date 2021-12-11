@@ -112,8 +112,8 @@ const err = (ind: ZEC, msg?: string | 0, nt?: 1) => {
 }
 
 const rb = (d: Uint8Array, b: number, n: number) => {
-  let i = 0, o = 0;
-  for (; i < n; ++i) o |= d[b++] << (i << 3);
+  let o = 0;
+  for (let i = 0; i < n; ++i) o |= d[b++] << (i << 3);
   return o;
 }
 
