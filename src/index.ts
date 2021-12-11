@@ -66,7 +66,9 @@ const cpw = (v: Uint8Array, t: number, s?: number, e?: number) => {
   if (s == null || s < 0) s = 0;
   if (e == null || e > v.length) e = v.length;
   while (s < e) {
-    v[t++] = v[s++];
+    v[t] = v[s];
+    t += 1;
+    v += 1;
   }
 }
 
@@ -113,11 +115,15 @@ const err = (ind: ZEC, msg?: string | 0, nt?: 1) => {
 
 const rb = (d: Uint8Array, b: number, n: number) => {
   let o = 0;
-  for (let i = 0; i < n; i += 1) o |= d[b++] << (i << 3);
+  for (let i = 0; i < n; i += 1)
+  {
+    o |= d[b] << (i << 3);
+    b += 1;
+  }
   return o;
 }
 
-const b4 = (d: Uint8Array, b: number) => (d[b] | (d[b + 1] << 8) | (d[b + 2] << 16) | (d[b + 3] << 24)) >>> 0;
+const b4 = (d: Uint8Array, b: number) => (d[b] | (d[b + 1] << 8) | (d[b + 2] << 16) | (d[b + 3] << 24)) | 0;
 
 // read Zstandard frame header
 const rzfh = (dat: Uint8Array, w?: Uint8Array | 1): number | DZstdState => {
@@ -148,7 +154,9 @@ const rzfh = (dat: Uint8Array, w?: Uint8Array | 1): number | DZstdState => {
     }
     if (ws > 2145386496) err(1);
     const buf = new Uint8Array((w == 1 ? (fss || ws) : w ? 0 : ws) + 12);
-    buf[0] = 1, buf[4] = 4, buf[8] = 8;
+    buf[0] = 1;
+    buf[4] = 4;
+    buf[8] = 8;
     return {
       b: bt + fsb,
       y: 0,
@@ -212,10 +220,13 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
       tpos += bits + 1;
       if (val > msk1fb) val -= msv;
     }
-    freq[++sym] = --val;
+    sym += 1;
+    val -= 1;
+    freq[sym] = val;
     if (val == -1) {
       probs += val;
-      syms[--ht] = sym;
+      ht -= 1;
+      syms[ht] = sym;
     } else probs -= val;
     if (!val) {
       do {
@@ -251,7 +262,8 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
   if (sympos) err(0);
   for (let i = 0; i < sz; i += 1) {
     // next state
-    const ns = dstate[syms[i]]++;
+    const ns = dstate[syms[i]];
+    dstate[syms[i]] += 1;
     // num bits
     const nb = nbits[i] = al - msb(ns);
     nstate[i] = (ns << nb) - sz;
@@ -289,32 +301,37 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
     let st1 = 0, st2 = 0, btr1 = fdt.b, btr2 = btr1
     // fse pos
     // pre-increment to account for original deficit of 1
-    let fpos = (++bt << 3) - 8 + msb(lb);
+    bt += 1;
+    let fpos = (bt << 3) - 8 + msb(lb);
     for (;;) {
       fpos -= btr1;
       if (fpos < epos) break;
       let cbt = fpos >> 3;
       st1 += ((dat[cbt] | (dat[cbt + 1] << 8)) >> (fpos & 7)) & ((1 << btr1) - 1);
-      hw[++wc] = fdt.s[st1];
+      wc += 1;
+      hw[wc] = fdt.s[st1];
       fpos -= btr2;
       if (fpos < epos) break;
       cbt = fpos >> 3;
       st2 += ((dat[cbt] | (dat[cbt + 1] << 8)) >> (fpos & 7)) & ((1 << btr2) - 1);
-      hw[++wc] = fdt.s[st2];
+      wc += 1;
+      hw[wc] = fdt.s[st2];
       btr1 = fdt.n[st1];
       st1 = fdt.t[st1];
       btr2 = fdt.n[st2];
       st2 = fdt.t[st2];
     }
-    if (++wc > 255) err(0);
+    wc += 1;
+    if (wc > 255) err(0);
   } else {
     wc = hb - 127;
     for (let i = 0; i < wc; i += 2) {
-      const byte = dat[++bt];
+      bt += 1;
+      const byte = dat[bt];
       hw[i] = byte >> 4;
       hw[i + 1] = byte & 15;
     }
-    ++bt;
+    bt += 1;
   }
   // weight exponential sum
   let wes = 0;
@@ -332,10 +349,11 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
   const rem = ts - wes;
   // must be power of 2
   if (rem & (rem - 1)) err(0);
-  hw[wc++] = msb(rem) + 1;
+  hw[wc] = msb(rem) + 1;
+  wc += 1;
   for (let i = 0; i < wc; i += 1) {
     const wt = hw[i];
-    ++rc[hw[i] = wt && (mb + 1 - wt)];
+    rc[hw[i] = wt && (mb + 1 - wt)] += 1;
   }
   // huf buf
   const hbuf = new Uint8Array(ts << 1);
@@ -414,8 +432,10 @@ const dhu = (dat: Uint8Array, out: Uint8Array, hu: HDT) => {
     const cbt = pos >> 3;
     const val = (dat[cbt] | (dat[cbt + 1] << 8) | (dat[cbt + 2] << 16)) >> (pos & 7);
     st = ((st << btr) | val) & msk;
-    out[++i] = hu.s[st];
-    pos -= (btr = hu.n[st]);
+    i += 1;
+    out[i] = hu.s[st];
+    btr = hu.n[st];
+    pos -= btr;
   }
   if (pos != eb || i + 1 != ss) err(0);
 }
@@ -425,9 +445,16 @@ const dhu = (dat: Uint8Array, out: Uint8Array, hu: HDT) => {
 const dhu4 = (dat: Uint8Array, out: Uint8Array, hu: HDT) => {
   let bt = 6;
   const ss = out.length, sz1 = (ss + 3) >> 2, sz2 = sz1 << 1, sz3 = sz1 + sz2;
-  dhu(dat.subarray(bt, bt += dat[0] | (dat[1] << 8)), out.subarray(0, sz1), hu);
-  dhu(dat.subarray(bt, bt += dat[2] | (dat[3] << 8)), out.subarray(sz1, sz2), hu);
-  dhu(dat.subarray(bt, bt += dat[4] | (dat[5] << 8)), out.subarray(sz2, sz3), hu);
+  let new_bt = bt;
+  new_bt += dat[0] | (dat[1] << 8);
+  dhu(dat.subarray(bt, new_bt), out.subarray(0, sz1), hu);
+  bt = new_bt;
+  new_bt += dat[2] | (dat[3] << 8);
+  dhu(dat.subarray(bt, new_bt), out.subarray(sz1, sz2), hu);
+  bt = new_bt;
+  new_bt += dat[4] | (dat[5] << 8);
+  dhu(dat.subarray(bt, new_bt), out.subarray(sz2, sz3), hu);
+  bt = new_bt;
   dhu(dat.subarray(bt), out.subarray(sz3), hu);
 }
 
@@ -439,12 +466,14 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
   st.l = b0 & 1;
   const sz = (b0 >> 3) | (dat[bt + 1] << 5) | (dat[bt + 2] << 13);
   // end byte for block
-  const ebt = (bt += 3) + sz;
+  bt += 3;
+  const ebt = (bt) + sz;
   if (btype == 1) {
     if (bt >= dat.length) return;
     st.b = bt + 1;
     if (out) {
-      fill(out, dat[bt], st.y, st.y += sz);
+      st.y += sz;
+      fill(out, dat[bt], st.y, st.y);
       return out;
     }
     return fill(new Uint8Array(sz), dat[bt]);
@@ -465,47 +494,119 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
     // lit src size  lit cmp sz 4 streams
     let lss = b3 >> 4, lcs = 0, s4 = 0;
     if (lbt < 2) {
-      if (sf & 1) lss |= (dat[++bt] << 4) | ((sf & 2) && (dat[++bt] << 12));
-      else lss = b3 >> 3;
+      if (sf & 1)
+      {
+        bt += 1;
+        lss |= (dat[bt] << 4);
+        bt += 1;
+        lss |= ((sf & 2) && (dat[bt] << 12));
+      }
+      else
+      {
+        lss = b3 >> 3;
+      }
     } else {
       s4 = sf;
-      if (sf < 2) lss |= ((dat[++bt] & 63) << 4), lcs = (dat[bt] >> 6) | (dat[++bt] << 2);
-      else if (sf == 2) lss |= (dat[++bt] << 4) | ((dat[++bt] & 3) << 12), lcs = (dat[bt] >> 2) | (dat[++bt] << 6);
-      else lss |= (dat[++bt] << 4) | ((dat[++bt] & 63) << 12), lcs = (dat[bt] >> 6) | (dat[++bt] << 2) | (dat[++bt] << 10);
+      if (sf < 2)
+      {
+        bt += 1;
+        lss |= ((dat[bt] & 63) << 4);
+        lcs = (dat[bt] >> 6);
+        bt += 1;
+        lcs |= (dat[bt] << 2);
+      }
+      else if (sf == 2)
+      {
+        bt += 1;
+        lss |= (dat[bt] << 4);
+        bt += 1;
+        lss |= ((dat[bt] & 3) << 12);
+        lcs = (dat[bt] >> 2);
+        bt += 1;
+        lcs |= (dat[bt] << 6);
+      }
+      else
+      {
+        bt += 1;
+        lss |= (dat[bt] << 4);
+        bt += 1;
+        lss |= ((dat[bt] & 63) << 12);
+        lcs = (dat[bt] >> 6) ;
+        bt += 1;
+        lcs |= (dat[bt] << 2);
+        bt += 1;
+        lcs |= (dat[bt] << 10);
+      }
     }
     bt += 1;
     // add literals to end - can never overlap with backreferences because unused literals always appended
     let buf = out ? out.subarray(st.y, st.y + st.m) : new Uint8Array(st.m);
     // starting point for literals
     let spl = buf.length - lss;
-    if (lbt == 0) buf.set(dat.subarray(bt, bt += lss), spl);
-    else if (lbt == 1) fill(buf, dat[bt++], spl);
+    if (lbt == 0)
+    {
+      let new_bt = bt + lss;
+      buf.set(dat.subarray(bt, new_bt), spl);
+      bt = new_bt;
+    }
+    else if (lbt == 1)
+    {
+      fill(buf, dat[bt], spl);
+      bt += 1;
+    }
     else {
       // huffman table
       let hu = st.h;
       if (lbt == 2) {
         const hud = rhu(dat, bt);
         // subtract description length
-        lcs += bt - (bt = hud[0]);
-        st.h = hu = hud[1];
+        lcs += bt - (hud[0]);
+        bt = hud[0];
+        st.h = hud[1];
+        hu = hud[1];
       }
       else if (!hu) err(0);
-      (s4 ? dhu4 : dhu)(dat.subarray(bt, bt += lcs), buf.subarray(spl), hu);
+      let new_bt = bt + lcs;
+      if (s4)
+      {
+        dhu4(dat.subarray(bt, new_bt), buf.subarray(spl), hu);
+      }
+      else
+      {
+        dhu(dat.subarray(bt, new_bt), buf.subarray(spl), hu);
+      }
+      
+      bt = new_bt;
     }
     // num sequences
-    let ns = dat[bt++];
+    let ns = dat[bt];
+    bt += 1;
     if (ns) {
-      if (ns == 255) ns = (dat[bt++] | (dat[bt++] << 8)) + 0x7F00;
-      else if (ns > 127) ns = ((ns - 128) << 8) | dat[bt++];
+      if (ns == 255)
+      {
+        ns = dat[bt];
+        bt += 1;
+        ns |= (dat[bt] << 8);
+        bt += 1;
+        ns += 0x7F00;
+      }
+      else if (ns > 127)
+      {
+        ns = ((ns - 128) << 8)
+        ns |= dat[bt];
+        bt += 1
+      }
       // symbol compression modes
-      const scm = dat[bt++];
+      const scm = dat[bt];
+      bt += 1;
       if (scm & 3) err(0);
       let dts: [FSEDT, FSEDT, FSEDT] = [dmlt, doct, dllt];
       for (let i = 2; i > -1; i -= 1) {
         const md = (scm >> ((i << 1) + 2)) & 3;
         if (md == 1) {
           // rle buf
-          const rbuf = new Uint8Array([0, 0, dat[bt++]]);
+          const rbuf = new Uint8Array([0, 0, dat[bt]]);
+          bt += 1;
           dts[i] = {
             s: rbuf.subarray(2, 3),
             n: rbuf.subarray(0, 1),
@@ -525,11 +626,13 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
       if (!lb) err(0);
       let spos = (ebt << 3) - 8 + msb(lb) - llt.b, cbt = spos >> 3, oubt = 0;
       let lst = ((dat[cbt] | (dat[cbt + 1] << 8)) >> (spos & 7)) & ((1 << llt.b) - 1);
-      cbt = (spos -= oct.b) >> 3;
+      spos -= oct.b;
+      cbt = spos >> 3;
       let ost = ((dat[cbt] | (dat[cbt + 1] << 8)) >> (spos & 7)) & ((1 << oct.b) - 1);
-      cbt = (spos -= mlt.b) >> 3;
+      spos -= mlt.b;
+      cbt = spos >> 3;
       let mst = ((dat[cbt] | (dat[cbt + 1] << 8)) >> (spos & 7)) & ((1 << mlt.b) - 1);
-      for (++ns; --ns;) {
+      for (; ns != 0; ns -= 1) {
         const llc = llt.s[lst];
         const lbtr = llt.n[lst];
         const mlc = mlt.s[mst];
@@ -537,27 +640,34 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
         const ofc = oct.s[ost];
         const obtr = oct.n[ost];
 
-        cbt = (spos -= ofc) >> 3;
+        spos -= ofc;
+        cbt = spos >> 3;
         const ofp = 1 << ofc;
         let off = ofp + (((dat[cbt] | (dat[cbt + 1] << 8) | (dat[cbt + 2] << 16) | (dat[cbt + 3] << 24)) >>> (spos & 7)) & (ofp - 1));
-        cbt = (spos -= mlb[mlc]) >> 3;
+        spos -= mlb[mlc];
+        cbt = spos >> 3;
         let ml = mlbl[mlc] + (((dat[cbt] | (dat[cbt + 1] << 8) | (dat[cbt + 2] << 16)) >> (spos & 7)) & ((1 << mlb[mlc]) - 1));
-        cbt = (spos -= llb[llc]) >> 3;
+        spos -= llb[llc];
+        cbt = spos >> 3;
         const ll = llbl[llc] + (((dat[cbt] | (dat[cbt + 1] << 8) | (dat[cbt + 2] << 16)) >> (spos & 7)) & ((1 << llb[llc]) - 1));
 
-        cbt = (spos -= lbtr) >> 3;
+        spos -= lbtr;
+        cbt = spos >> 3;
         lst = llt.t[lst] + (((dat[cbt] | (dat[cbt + 1] << 8)) >> (spos & 7)) & ((1 << lbtr) - 1));
-        cbt = (spos -= mbtr) >> 3;
+        spos -= mbtr;
+        cbt = spos >> 3;
         mst = mlt.t[mst] + (((dat[cbt] | (dat[cbt + 1] << 8)) >> (spos & 7)) & ((1 << mbtr) - 1));
-        cbt = (spos -= obtr) >> 3;
+        spos -= obtr;
+        cbt = spos >> 3;
         ost = oct.t[ost] + (((dat[cbt] | (dat[cbt + 1] << 8)) >> (spos & 7)) & ((1 << obtr) - 1));
 
         if (off > 3) {
           st.o[2] = st.o[1];
           st.o[1] = st.o[0];
-          st.o[0] = off -= 3;
+          off -= 3;
+          st.o[0] = off;
         } else {
-          const idx = off - ((ll != 0) as unknown as number);
+          const idx = off - ((ll != 0) ? 1 : 0);
           if (idx) {
             off = idx == 3 ? st.o[0] - 1 : st.o[idx]
             if (idx > 1) st.o[2] = st.o[1];
@@ -568,7 +678,8 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
         for (let i = 0; i < ll; i += 1) {
           buf[oubt + i] = buf[spl + i];
         }
-        oubt += ll, spl += ll;
+        oubt += ll;
+        spl += ll;
         let stin = oubt - off;
         if (stin < 0) {
           let len = -stin;
@@ -577,16 +688,20 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
           for (let i = 0; i < len; i += 1) {
             buf[oubt + i] = st.w[bs + i];
           }
-          oubt += len, ml -= len, stin = 0;
+          oubt += len;
+          ml -= len;
+          stin = 0;
         }
         for (let i = 0; i < ml; i += 1) {
           buf[oubt + i] = buf[stin + i];
         }
-        oubt += ml
+        oubt += ml;
       }
       if (oubt != spl) {
         while (spl < buf.length) {
-          buf[oubt++] = buf[spl++];
+          buf[oubt] = buf[spl];
+          oubt += 1;
+          spl += 1;
         }
       } else oubt = buf.length;
       if (out) st.y += oubt;
@@ -716,9 +831,11 @@ export class Decompress {
         this.c = [];
         this.l = 0;
       }
-      if (typeof (this.s = rzfh(chunk)) == 'number') return this.push(chunk, final);
+      this.s = rzfh(chunk);
+      if (typeof (this.s) == 'number') return this.push(chunk, final);
     }
     if (typeof this.s != 'number') {
+      let s_zstdstate = this.s as DZstdState;
       if (ncs < (this.z || 4)) {
         if (final) err(5);
         this.c.push(chunk);
@@ -731,28 +848,31 @@ export class Decompress {
         this.c = [];
         this.l = 0;
       }
-      if (!this.z && ncs < (this.z = (chunk[(this.s as DZstdState).b] & 2) ? 5 : 4 + ((chunk[(this.s as DZstdState).b] >> 3) | (chunk[(this.s as DZstdState).b + 1] << 5) | (chunk[(this.s as DZstdState).b + 2] << 13)))) {
+      let chunk_check = (chunk[s_zstdstate.b] & 2) ? 5 : 4 + ((chunk[s_zstdstate.b] >> 3) | (chunk[s_zstdstate.b + 1] << 5) | (chunk[s_zstdstate.b + 2] << 13));
+      if (!this.z && ncs < chunk_check) {
+        this.z = chunk_check;
         if (final) err(5);
         this.c.push(chunk);
         this.l = ncs;
         return;
       } else this.z = 0;
       for (;;) {
-        const blk = rzb(chunk, this.s as DZstdState);
+        const blk = rzb(chunk, s_zstdstate);
         if (!blk) {
           if (final) err(5);
-          const adc = chunk.subarray((this.s as DZstdState).b);
-          (this.s as DZstdState).b = 0;
-          this.c.push(adc), this.l += adc.length;
+          const adc = chunk.subarray(s_zstdstate.b);
+          s_zstdstate.b = 0;
+          this.c.push(adc);
+          this.l += adc.length;
           return;
         } else {
           this.ondata(blk, false);
-          cpw((this.s as DZstdState).w, 0, blk.length);
-          (this.s as DZstdState).w.set(blk, (this.s as DZstdState).w.length - blk.length);
+          cpw(s_zstdstate.w, 0, blk.length);
+          s_zstdstate.w.set(blk, s_zstdstate.w.length - blk.length);
         }
-        if ((this.s as DZstdState).l) {
-          const rest = chunk.subarray((this.s as DZstdState).b);
-          this.s = (this.s as DZstdState).c * 4;
+        if (s_zstdstate.l) {
+          const rest = chunk.subarray(s_zstdstate.b);
+          this.s = s_zstdstate.c * 4;
           this.push(rest, final);
           return;
         }
