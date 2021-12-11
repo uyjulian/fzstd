@@ -110,7 +110,6 @@ export interface ZstdError extends Error {
 const err = (ind: ZEC, msg?: string | 0, nt?: 1) => {
   const e: Partial<ZstdError> = new Error(msg || ec[ind]);
   e.code = ind;
-  if (Error.captureStackTrace) Error.captureStackTrace(e, err);
   if (!nt) throw e;
   return e as ZstdError;
 }
