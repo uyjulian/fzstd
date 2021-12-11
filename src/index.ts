@@ -184,8 +184,8 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
   if (al > mal) err(3);
   // size
   const sz = 1 << al;
-  // probabilities symbols  repeat   index   high threshold
-  let probs = sz, sym = -1, re = -1, i = -1, ht = sz;
+  // probabilities symbols  repeat   high threshold
+  let probs = sz, sym = -1, re = -1, ht = sz;
   // optimization: single allocation is much faster
   const buf = new ArrayBuffer(512 + (sz << 2));
   const freq = new Int16Array(buf, 0, 256);
@@ -240,7 +240,7 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
       continue;
     }
     // This is split into two loops in zstd to avoid branching, but as JS is higher-level that is unnecessary
-    for (i = 0; i < sf; ++i) {
+    for (let i = 0; i < sf; ++i) {
       syms[sympos] = s;
       do {
         sympos = (sympos + sstep) & smask;
@@ -249,7 +249,7 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
   }
   // After spreading symbols, should be zero again
   if (sympos) err(0);
-  for (i = 0; i < sz; ++i) {
+  for (let i = 0; i < sz; ++i) {
     // next state
     const ns = dstate[syms[i]]++;
     // num bits
@@ -266,8 +266,8 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
 
 // read huffman
 const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
-  //  index  weight count
-  let i = 0, wc = -1;
+  //  weight count
+  let wc = -1;
   //    buffer             header byte
   const buf = new Uint8Array(292), hb = dat[bt];
   // huffman weights
@@ -309,7 +309,7 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
     if (++wc > 255) err(0);
   } else {
     wc = hb - 127;
-    for (; i < wc; i += 2) {
+    for (let i = 0; i < wc; i += 2) {
       const byte = dat[++bt];
       hw[i] = byte >> 4;
       hw[i + 1] = byte & 15;
@@ -318,7 +318,7 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
   }
   // weight exponential sum
   let wes = 0;
-  for (i = 0; i < wc; ++i) {
+  for (let i = 0; i < wc; ++i) {
     const wt = hw[i];
     // bits must be at most 11, same as weight
     if (wt > 11) err(0);
@@ -333,7 +333,7 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
   // must be power of 2
   if (rem & (rem - 1)) err(0);
   hw[wc++] = msb(rem) + 1;
-  for (i = 0; i < wc; ++i) {
+  for (let i = 0; i < wc; ++i) {
     const wt = hw[i];
     ++rc[hw[i] = wt && (mb + 1 - wt)];
   }
@@ -342,12 +342,12 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
   //    symbols                      num bits
   const syms = hbuf.subarray(0, ts), nb = hbuf.subarray(ts);
   ri[mb] = 0;
-  for (i = mb; i > 0; --i) {
+  for (let i = mb; i > 0; --i) {
     const pv = ri[i];
     fill(nb, i, pv, ri[i - 1] = pv + rc[i] * (1 << (mb - i)));
   }
   if (ri[0] != ts) err(0);
-  for (i = 0; i < wc; ++i) {
+  for (let i = 0; i < wc; ++i) {
     const bits = hw[i];
     if (bits) {
       const code = ri[bits];
