@@ -57,7 +57,7 @@ const fill = (v: Uint8Array, n: number, s?: number, e?: number) => {
   if (Uint8Array.prototype.fill) return Uint8Array.prototype.fill.call(v, n, s, e);
   if (s == null || s < 0) s = 0;
   if (e == null || e > v.length) e = v.length;
-  for (; s < e; ++s) v[s] = n;
+  for (; s < e; s += 1) v[s] = n;
   return v;
 }
 
@@ -113,7 +113,7 @@ const err = (ind: ZEC, msg?: string | 0, nt?: 1) => {
 
 const rb = (d: Uint8Array, b: number, n: number) => {
   let o = 0;
-  for (let i = 0; i < n; ++i) o |= d[b++] << (i << 3);
+  for (let i = 0; i < n; i += 1) o |= d[b++] << (i << 3);
   return o;
 }
 
@@ -171,7 +171,7 @@ const rzfh = (dat: Uint8Array, w?: Uint8Array | 1): number | DZstdState => {
 // most significant bit for nonzero
 const msb = (val: number) => {
   let bits = 0;
-  for (; (1 << bits) <= val; ++bits);
+  for (; (1 << bits) <= val; bits += 1);
   return bits - 1;
 }
 
@@ -233,14 +233,14 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
   const sstep = (sz >> 1) + (sz >> 3) + 3;
   // sym mask
   const smask = sz - 1;
-  for (let s = 0; s <= sym; ++s) {
+  for (let s = 0; s <= sym; s += 1) {
     const sf = freq[s];
     if (sf < 1) {
       dstate[s] = -sf;
       continue;
     }
     // This is split into two loops in zstd to avoid branching, but as JS is higher-level that is unnecessary
-    for (let i = 0; i < sf; ++i) {
+    for (let i = 0; i < sf; i += 1) {
       syms[sympos] = s;
       do {
         sympos = (sympos + sstep) & smask;
@@ -249,7 +249,7 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
   }
   // After spreading symbols, should be zero again
   if (sympos) err(0);
-  for (let i = 0; i < sz; ++i) {
+  for (let i = 0; i < sz; i += 1) {
     // next state
     const ns = dstate[syms[i]]++;
     // num bits
@@ -318,7 +318,7 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
   }
   // weight exponential sum
   let wes = 0;
-  for (let i = 0; i < wc; ++i) {
+  for (let i = 0; i < wc; i += 1) {
     const wt = hw[i];
     // bits must be at most 11, same as weight
     if (wt > 11) err(0);
@@ -333,7 +333,7 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
   // must be power of 2
   if (rem & (rem - 1)) err(0);
   hw[wc++] = msb(rem) + 1;
-  for (let i = 0; i < wc; ++i) {
+  for (let i = 0; i < wc; i += 1) {
     const wt = hw[i];
     ++rc[hw[i] = wt && (mb + 1 - wt)];
   }
@@ -342,12 +342,12 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
   //    symbols                      num bits
   const syms = hbuf.subarray(0, ts), nb = hbuf.subarray(ts);
   ri[mb] = 0;
-  for (let i = mb; i > 0; --i) {
+  for (let i = mb; i > 0; i -= 1) {
     const pv = ri[i];
     fill(nb, i, pv, ri[i - 1] = pv + rc[i] * (1 << (mb - i)));
   }
   if (ri[0] != ts) err(0);
-  for (let i = 0; i < wc; ++i) {
+  for (let i = 0; i < wc; i += 1) {
     const bits = hw[i];
     if (bits) {
       const code = ri[bits];
@@ -382,7 +382,7 @@ const doct = /*#__PURE__ */ rfse(/*#__PURE__*/ new Uint8Array([
 // bits to baseline
 const b2bl = (b: Uint8Array, s: number) => {
   const len = b.length, bl = new Int32Array(len);
-  for (let i = 0; i < len; ++i) {
+  for (let i = 0; i < len; i += 1) {
     bl[i] = s;
     s += 1 << b[i];
   }
@@ -473,7 +473,7 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
       else if (sf == 2) lss |= (dat[++bt] << 4) | ((dat[++bt] & 3) << 12), lcs = (dat[bt] >> 2) | (dat[++bt] << 6);
       else lss |= (dat[++bt] << 4) | ((dat[++bt] & 63) << 12), lcs = (dat[bt] >> 6) | (dat[++bt] << 2) | (dat[++bt] << 10);
     }
-    ++bt;
+    bt += 1;
     // add literals to end - can never overlap with backreferences because unused literals always appended
     let buf = out ? out.subarray(st.y, st.y + st.m) : new Uint8Array(st.m);
     // starting point for literals
@@ -501,7 +501,7 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
       const scm = dat[bt++];
       if (scm & 3) err(0);
       let dts: [FSEDT, FSEDT, FSEDT] = [dmlt, doct, dllt];
-      for (let i = 2; i > -1; --i) {
+      for (let i = 2; i > -1; i -= 1) {
         const md = (scm >> ((i << 1) + 2)) & 3;
         if (md == 1) {
           // rle buf
@@ -565,7 +565,7 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
             st.o[0] = off;
           } else off = st.o[0];
         }
-        for (let i = 0; i < ll; ++i) {
+        for (let i = 0; i < ll; i += 1) {
           buf[oubt + i] = buf[spl + i];
         }
         oubt += ll, spl += ll;
@@ -574,12 +574,12 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
           let len = -stin;
           const bs = st.e + stin;
           if (len > ml) len = ml;
-          for (let i = 0; i < len; ++i) {
+          for (let i = 0; i < len; i += 1) {
             buf[oubt + i] = st.w[bs + i];
           }
           oubt += len, ml -= len, stin = 0;
         }
-        for (let i = 0; i < ml; ++i) {
+        for (let i = 0; i < ml; i += 1) {
           buf[oubt + i] = buf[stin + i];
         }
         oubt += ml
@@ -595,7 +595,7 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
       if (out) {
         st.y += lss;
         if (spl) {
-          for (let i = 0; i < lss; ++i) {
+          for (let i = 0; i < lss; i += 1) {
             buf[i] = buf[spl + i];
           }
         }
@@ -611,7 +611,7 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
 const cct = (bufs: Uint8Array[], ol: number) => {
   if (bufs.length == 1) return bufs[0];
   const buf = new Uint8Array(ol);
-  for (let i = 0, b = 0; i < bufs.length; ++i) {
+  for (let i = 0, b = 0; i < bufs.length; i += 1) {
     const chk = bufs[i];
     buf.set(chk, b);
     b += chk.length;
