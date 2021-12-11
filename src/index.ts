@@ -57,7 +57,11 @@ const fill = (v: Uint8Array, n: number, s?: number, e?: number) => {
   if (Uint8Array.prototype.fill) return Uint8Array.prototype.fill.call(v, n, s, e);
   if (s == null || s < 0) s = 0;
   if (e == null || e > v.length) e = v.length;
-  for (; s < e; s += 1) v[s] = n;
+  while (s < e)
+  {
+    v[s] = n;
+    s += 1;
+  }
   return v;
 }
 
@@ -179,7 +183,10 @@ const rzfh = (dat: Uint8Array, w?: Uint8Array | 1): number | DZstdState => {
 // most significant bit for nonzero
 const msb = (val: number) => {
   let bits = 0;
-  for (; (1 << bits) <= val; bits += 1);
+  while ((1 << bits) <= val)
+  {
+    bits += 1;
+  }
   return bits - 1;
 }
 
@@ -229,13 +236,13 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
       syms[ht] = sym;
     } else probs -= val;
     if (val == 0) {
-      do {
+      while (re == 3) {
         // repeat byte
         const rbt = tpos >> 3;
         re = ((dat[rbt] | (dat[rbt + 1] << 8)) >> (tpos & 7)) & 3;
         tpos += 2;
         sym += re;
-      } while (re == 3);
+      }
     }
   }
   if (sym > 255 || probs != 0) err(0);
@@ -244,7 +251,7 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
   const sstep = (sz >> 1) + (sz >> 3) + 3;
   // sym mask
   const smask = sz - 1;
-  for (let s = 0; s <= sym; s += 1) {
+  for (let s = 0; s < (sym + 1); s += 1) {
     const sf = freq[s];
     if (sf < 1) {
       dstate[s] = -sf;
@@ -253,9 +260,10 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
     // This is split into two loops in zstd to avoid branching, but as JS is higher-level that is unnecessary
     for (let i = 0; i < sf; i += 1) {
       syms[sympos] = s;
-      do {
+      sympos = (sympos + sstep) & smask;
+      while (sympos >= ht) {
         sympos = (sympos + sstep) & smask;
-      } while (sympos >= ht);
+      }
     }
   }
   // After spreading symbols, should be zero again
@@ -305,7 +313,7 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
     // pre-increment to account for original deficit of 1
     bt += 1;
     let fpos = (bt << 3) - 8 + msb(lb);
-    for (;;) {
+    while (true) {
       fpos -= btr1;
       if (fpos < epos) break;
       let cbt = fpos >> 3;
@@ -430,7 +438,7 @@ const dhu = (dat: Uint8Array, out: Uint8Array, hu: HDT) => {
   const len = dat.length, ss = out.length, lb = dat[len - 1], msk = (1 << hu.b) - 1, eb = -hu.b;
   if (lb == 0) err(0);
   let st = 0, btr = hu.b, pos = (len << 3) - 8 + msb(lb) - btr, i = -1;
-  for (; pos > eb && i < ss;) {
+  while (pos > eb && i < ss) {
     const cbt = pos >> 3;
     const val = (dat[cbt] | (dat[cbt + 1] << 8) | (dat[cbt + 2] << 16)) >> (pos & 7);
     st = ((st << btr) | val) & msk;
@@ -639,7 +647,7 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
       spos -= mlt.b;
       cbt = spos >> 3;
       let mst = ((dat[cbt] | (dat[cbt + 1] << 8)) >> (spos & 7)) & ((1 << mlt.b) - 1);
-      for (; ns != 0; ns -= 1) {
+      while (ns != 0) {
         const llc = llt.s[lst];
         const lbtr = llt.n[lst];
         const mlc = mlt.s[mst];
@@ -703,6 +711,7 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
           buf[oubt + i] = buf[stin + i];
         }
         oubt += ml;
+        ns -= 1;
       }
       if (oubt != spl) {
         while (spl < buf.length) {
@@ -752,7 +761,7 @@ const cct = (bufs: Uint8Array[], ol: number) => {
  */
 export function decompress(dat: Uint8Array, buf?: Uint8Array) {
   let bt = 0, bufs: Uint8Array[] = [], nb = (+buf) ? 0 : 1, ol = 0;
-  for (; dat.length;) {
+  while (dat.length != 0) {
     let st = rzfh(dat, nb || buf);
     if (typeof st == 'object') {
       if (nb != 0) {
@@ -765,7 +774,7 @@ export function decompress(dat: Uint8Array, buf?: Uint8Array) {
         bufs.push(buf);
         st.e = 0;
       }
-      for (; !st.l;) {
+      while (st.l == 0) {
         const blk = rzb(dat, st, buf);
         if (!blk) err(5);
         if (buf) st.e = st.y;
@@ -863,7 +872,7 @@ export class Decompress {
         this.l = ncs;
         return;
       } else this.z = 0;
-      for (;;) {
+      while (true) {
         const blk = rzb(chunk, s_zstdstate);
         if (!blk) {
           if (final == true) err(5);
