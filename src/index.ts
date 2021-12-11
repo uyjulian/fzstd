@@ -135,8 +135,14 @@ const rzfh = (dat: Uint8Array, w?: Uint8Array | 1): number | DZstdState => {
   if (n3 == 0x2FB528 && dat[3] == 253) {
     // Zstandard
     const flg = dat[4];
-    //    single segment       checksum             dict flag     frame content flag
-    const ss = (flg >> 5) & 1, cc = (flg >> 2) & 1, df = flg & 3, fcf = flg >> 6;
+    // single segment
+    const ss = (flg >> 5) & 1;
+    // checksum
+    const cc = (flg >> 2) & 1;
+    // dict flag
+    const df = flg & 3;
+    // frame content flag
+    const fcf = flg >> 6;
     if (flg & 8 != 0) err(0);
     // byte
     let bt = 6 - ss;
@@ -146,7 +152,7 @@ const rzfh = (dat: Uint8Array, w?: Uint8Array | 1): number | DZstdState => {
     const di = rb(dat, bt, db);
     bt += db;
     // frame size bytes
-    const fsb = fcf ? (1 << fcf) : ss;
+    const fsb = fcf != 0 ? (1 << fcf) : ss;
     // frame source size
     const fss = rb(dat, bt, fsb) + ((fcf == 1) && 256);
     // window size
@@ -199,8 +205,14 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
   if (al > mal) err(3);
   // size
   const sz = 1 << al;
-  // probabilities symbols  repeat   high threshold
-  let probs = sz, sym = -1, re = -1, ht = sz;
+  // probabilities
+  let probs = sz;
+  // symbols
+  let sym = -1;
+  // repeat
+  let re = -1;
+  // high threshold
+  let ht = sz;
   // optimization: single allocation is much faster
   const buf = new ArrayBuffer(512 + (sz << 2));
   const freq = new Int16Array(buf, 0, 256);
@@ -222,19 +234,31 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
     const msv = msk - probs - 1;
     // small value
     const sval = val & msk1fb;
-    if (sval < msv) tpos += bits, val = sval;
+    if (sval < msv)
+    {
+      tpos += bits;
+      val = sval;
+    }
     else {
       tpos += bits + 1;
-      if (val > msk1fb) val -= msv;
+      if (val > msk1fb)
+      {
+        val -= msv;
+      }
     }
     sym += 1;
     val -= 1;
     freq[sym] = val;
-    if (val == -1) {
+    if (val == -1)
+    {
       probs += val;
       ht -= 1;
       syms[ht] = sym;
-    } else probs -= val;
+    }
+    else 
+    {
+      probs -= val;
+    }
     if (val == 0) {
       while (re == 3) {
         // repeat byte
@@ -288,8 +312,10 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
 const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
   //  weight count
   let wc = -1;
-  //    buffer             header byte
-  const buf = new Uint8Array(292), hb = dat[bt];
+  // buffer             
+  const buf = new Uint8Array(292);
+  // header byte
+  const hb = dat[bt];
   // huffman weights
   const hw = buf.subarray(0, 256);
   // rank count
@@ -307,8 +333,14 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
     // last byte
     const lb = dat[bt];
     if (lb == 0) err(0);
-    //  state1   state2   state1 bits   state2 bits
-    let st1 = 0, st2 = 0, btr1 = fdt.b, btr2 = btr1
+    // state1
+    let st1 = 0;
+    // state2
+    let st2 = 0;
+    // state1 bits
+    let btr1 = fdt.b;
+    // state2 bits
+    let btr2 = btr1;
     // fse pos
     // pre-increment to account for original deficit of 1
     bt += 1;
@@ -349,7 +381,7 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
     const wt = hw[i];
     // bits must be at most 11, same as weight
     if (wt > 11) err(0);
-    wes += wt && (1 << (wt - 1));
+    wes += wt != 0 ? (1 << (wt - 1)) : 0;
   }
   // max bits
   const mb = msb(wes) + 1;
@@ -367,19 +399,23 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
   }
   // huf buf
   const hbuf = new Uint8Array(ts << 1);
-  //    symbols                      num bits
-  const syms = hbuf.subarray(0, ts), nb = hbuf.subarray(ts);
+  // symbols
+  const syms = hbuf.subarray(0, ts);
+  // num bits
+  const nb = hbuf.subarray(ts);
   ri[mb] = 0;
   for (let i = mb; i > 0; i -= 1) {
     const pv = ri[i];
-    fill(nb, i, pv, ri[i - 1] = pv + rc[i] * (1 << (mb - i)));
+    ri[i - 1] = pv + rc[i] * (1 << (mb - i));
+    fill(nb, i, pv, ri[i - 1]);
   }
   if (ri[0] != ts) err(0);
   for (let i = 0; i < wc; i += 1) {
     const bits = hw[i];
     if (bits != 0) {
       const code = ri[bits];
-      fill(syms, i, code, ri[bits] = code + (1 << (mb - bits)));
+      ri[bits] = code + (1 << (mb - bits));
+      fill(syms, i, code, ri[bits]);
     }
   }
   return [bt, {
@@ -409,7 +445,8 @@ const doct = /*#__PURE__ */ rfse(/*#__PURE__*/ new Uint8Array([
 
 // bits to baseline
 const b2bl = (b: Uint8Array, s: number) => {
-  const len = b.length, bl = new Int32Array(len);
+  const len = b.length;
+  const bl = new Int32Array(len);
   for (let i = 0; i < len; i += 1) {
     bl[i] = s;
     s += 1 << b[i];
@@ -435,9 +472,16 @@ const mlbl = /*#__PURE__ */ b2bl(mlb, 3);
 
 // decode huffman stream
 const dhu = (dat: Uint8Array, out: Uint8Array, hu: HDT) => {
-  const len = dat.length, ss = out.length, lb = dat[len - 1], msk = (1 << hu.b) - 1, eb = -hu.b;
+  const len = dat.length;
+  const ss = out.length;
+  const lb = dat[len - 1];
+  const msk = (1 << hu.b) - 1;
+  const eb = -hu.b;
   if (lb == 0) err(0);
-  let st = 0, btr = hu.b, pos = (len << 3) - 8 + msb(lb) - btr, i = -1;
+  let st = 0;
+  let btr = hu.b;
+  let pos = (len << 3) - 8 + msb(lb) - btr;
+  let i = -1;
   while (pos > eb && i < ss) {
     const cbt = pos >> 3;
     const val = (dat[cbt] | (dat[cbt + 1] << 8) | (dat[cbt + 2] << 16)) >> (pos & 7);
@@ -454,7 +498,10 @@ const dhu = (dat: Uint8Array, out: Uint8Array, hu: HDT) => {
 // TODO: use workers to parallelize
 const dhu4 = (dat: Uint8Array, out: Uint8Array, hu: HDT) => {
   let bt = 6;
-  const ss = out.length, sz1 = (ss + 3) >> 2, sz2 = sz1 << 1, sz3 = sz1 + sz2;
+  const ss = out.length;
+  const sz1 = (ss + 3) >> 2;
+  const sz2 = sz1 << 1;
+  const sz3 = sz1 + sz2;
   let new_bt = bt;
   new_bt += dat[0] | (dat[1] << 8);
   dhu(dat.subarray(bt, new_bt), out.subarray(0, sz1), hu);
@@ -471,8 +518,10 @@ const dhu4 = (dat: Uint8Array, out: Uint8Array, hu: HDT) => {
 // read Zstandard block
 const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
   let bt = st.b;
-  //    byte 0        block type
-  const b0 = dat[bt], btype = (b0 >> 1) & 3;
+  // byte 0        
+  const b0 = dat[bt];
+  // block type
+  const btype = (b0 >> 1) & 3;
   st.l = b0 & 1;
   const sz = (b0 >> 3) | (dat[bt + 1] << 5) | (dat[bt + 2] << 13);
   // end byte for block
@@ -499,10 +548,18 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
     return slc(dat, bt, ebt);
   }
   if (btype == 2) {
-    //    byte 3        lit btype     size format
-    const b3 = dat[bt], lbt = b3 & 3, sf = (b3 >> 2) & 3;
-    // lit src size  lit cmp sz 4 streams
-    let lss = b3 >> 4, lcs = 0, s4 = 0;
+    // byte 3             
+    const b3 = dat[bt];
+    // lit btype
+    const lbt = b3 & 3;
+    // size format
+    const sf = (b3 >> 2) & 3;
+    // lit src size
+    let lss = b3 >> 4;
+    // lit cmp sz
+    let lcs = 0;
+    // 4 streams
+    let s4 = 0;
     if (lbt < 2) {
       if (sf & 1 != 0)
       {
@@ -639,7 +696,9 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
       const llt = dts[2];
       const lb = dat[ebt - 1];
       if (lb == 0) err(0);
-      let spos = (ebt << 3) - 8 + msb(lb) - llt.b, cbt = spos >> 3, oubt = 0;
+      let spos = (ebt << 3) - 8 + msb(lb) - llt.b;
+      let cbt = spos >> 3;
+      let oubt = 0;
       let lst = ((dat[cbt] | (dat[cbt + 1] << 8)) >> (spos & 7)) & ((1 << llt.b) - 1);
       spos -= oct.b;
       cbt = spos >> 3;
@@ -760,7 +819,10 @@ const cct = (bufs: Uint8Array[], ol: number) => {
  * @returns The decompressed data
  */
 export function decompress(dat: Uint8Array, buf?: Uint8Array) {
-  let bt = 0, bufs: Uint8Array[] = [], nb = (+buf) ? 0 : 1, ol = 0;
+  let bt = 0;
+  let bufs: Uint8Array[] = [];
+  let nb = (+buf) ? 0 : 1;
+  let ol = 0;
   while (dat.length != 0) {
     let st = rzfh(dat, nb || buf);
     if (typeof st == 'object') {
