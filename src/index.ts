@@ -291,7 +291,9 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
   // NOTE: at this point bt is 1 less than expected
   if (hb < 128) {
     // end byte, fse decode table
-    const [ebt, fdt] = rfse(dat, bt + 1, 6);
+    let rfse_tmp = rfse(dat, bt + 1, 6);
+    const ebt = rfse_tmp[0];
+    const fdt = rfse_tmp[1];
     bt += hb;
     const epos = ebt << 3;
     // last byte
@@ -615,13 +617,18 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
           };
         } else if (md == 2) {
           // accuracy log 8 for offsets, 9 for others
-          [bt, dts[i]] = rfse(dat, bt, 9 - (i & 1));
+          let tmp_rfse = rfse(dat, bt, 9 - (i & 1));
+          bt = tmp_rfse[0];
+          dts[i] = tmp_rfse[1];
         } else if (md == 3) {
           if (!st.t) err(0);
           dts[i] = st.t[i];
         }
       }
-      const [mlt, oct, llt] = st.t = dts;
+      st.t = dts;
+      const mlt = dts[0];
+      const oct = dts[1];
+      const llt = dts[2];
       const lb = dat[ebt - 1];
       if (!lb) err(0);
       let spos = (ebt << 3) - 8 + msb(lb) - llt.b, cbt = spos >> 3, oubt = 0;
