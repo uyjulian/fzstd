@@ -1,8 +1,5 @@
 // Some numerical data is initialized as -1 even when it doesn't need initialization to help the JIT infer types
 
-// aliases for shorter compressed code (most minifers don't do this)
-const ab = ArrayBuffer, u8 = Uint8Array, u16 = Uint16Array, i16 = Int16Array, u32 = Uint32Array, i32 = Int32Array;
-
 // Huffman decoding table
 interface HDT {
   // initial bits
@@ -48,16 +45,16 @@ interface DZstdState {
 }
 
 const slc = (v: Uint8Array, s: number, e?: number) => {
-  if (u8.prototype.slice) return u8.prototype.slice.call(v, s, e);
+  if (Uint8Array.prototype.slice) return Uint8Array.prototype.slice.call(v, s, e);
   if (s == null || s < 0) s = 0;
   if (e == null || e > v.length) e = v.length;
-  const n = new u8(e - s);
+  const n = new Uint8Array(e - s);
   n.set(v.subarray(s, e));
   return n;
 }
 
 const fill = (v: Uint8Array, n: number, s?: number, e?: number) => {
-  if (u8.prototype.fill) return u8.prototype.fill.call(v, n, s, e);
+  if (Uint8Array.prototype.fill) return Uint8Array.prototype.fill.call(v, n, s, e);
   if (s == null || s < 0) s = 0;
   if (e == null || e > v.length) e = v.length;
   for (; s < e; ++s) v[s] = n;
@@ -65,7 +62,7 @@ const fill = (v: Uint8Array, n: number, s?: number, e?: number) => {
 }
 
 const cpw = (v: Uint8Array, t: number, s?: number, e?: number) => {
-  if (u8.prototype.copyWithin) return u8.prototype.copyWithin.call(v, t, s, e);
+  if (Uint8Array.prototype.copyWithin) return Uint8Array.prototype.copyWithin.call(v, t, s, e);
   if (s == null || s < 0) s = 0;
   if (e == null || e > v.length) e = v.length;
   while (s < e) {
@@ -150,7 +147,7 @@ const rzfh = (dat: Uint8Array, w?: Uint8Array | 1): number | DZstdState => {
       ws = wb + (wb >> 3) * (dat[5] & 7);
     }
     if (ws > 2145386496) err(1);
-    const buf = new u8((w == 1 ? (fss || ws) : w ? 0 : ws) + 12);
+    const buf = new Uint8Array((w == 1 ? (fss || ws) : w ? 0 : ws) + 12);
     buf[0] = 1, buf[4] = 4, buf[8] = 8;
     return {
       b: bt + fsb,
@@ -159,7 +156,7 @@ const rzfh = (dat: Uint8Array, w?: Uint8Array | 1): number | DZstdState => {
       d: di,
       w: (w && w != 1) ? w : buf.subarray(12),
       e: ws,
-      o: new i32(buf.buffer, 0, 3),
+      o: new Int32Array(buf.buffer, 0, 3),
       u: fss,
       c: cc,
       m: Math.min(131072, ws)
@@ -190,14 +187,14 @@ const rfse = (dat: Uint8Array, bt: number, mal: number): [number, FSEDT] => {
   // probabilities symbols  repeat   index   high threshold
   let probs = sz, sym = -1, re = -1, i = -1, ht = sz;
   // optimization: single allocation is much faster
-  const buf = new ab(512 + (sz << 2));
-  const freq = new i16(buf, 0, 256);
+  const buf = new ArrayBuffer(512 + (sz << 2));
+  const freq = new Int16Array(buf, 0, 256);
   // same view as freq
-  const dstate = new u16(buf, 0, 256);
-  const nstate = new u16(buf, 512, sz);
+  const dstate = new Uint16Array(buf, 0, 256);
+  const nstate = new Uint16Array(buf, 512, sz);
   const bb1 = 512 + (sz << 1);
-  const syms = new u8(buf, bb1, sz);
-  const nbits = new u8(buf, bb1 + sz);
+  const syms = new Uint8Array(buf, bb1, sz);
+  const nbits = new Uint8Array(buf, bb1 + sz);
   while (sym < 255 && probs > 0) {
     const bits = msb(probs + 1);
     const cbt = tpos >> 3;
@@ -272,13 +269,13 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
   //  index  weight count
   let i = 0, wc = -1;
   //    buffer             header byte
-  const buf = new u8(292), hb = dat[bt];
+  const buf = new Uint8Array(292), hb = dat[bt];
   // huffman weights
   const hw = buf.subarray(0, 256);
   // rank count
   const rc = buf.subarray(256, 268);
   // rank index
-  const ri = new u16(buf.buffer, 268);
+  const ri = new Uint16Array(buf.buffer, 268);
   // NOTE: at this point bt is 1 less than expected
   if (hb < 128) {
     // end byte, fse decode table
@@ -341,7 +338,7 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
     ++rc[hw[i] = wt && (mb + 1 - wt)];
   }
   // huf buf
-  const hbuf = new u8(ts << 1);
+  const hbuf = new Uint8Array(ts << 1);
   //    symbols                      num bits
   const syms = hbuf.subarray(0, ts), nb = hbuf.subarray(ts);
   ri[mb] = 0;
@@ -368,23 +365,23 @@ const rhu = (dat: Uint8Array, bt: number): [number, HDT] => {
 // https://gist.github.com/101arrowz/a979452d4355992cbf8f257cbffc9edd
 
 // default literal length table
-const dllt = /*#__PURE__*/ rfse(/*#__PURE__*/ new u8([
+const dllt = /*#__PURE__*/ rfse(/*#__PURE__*/ new Uint8Array([
   81, 16, 99, 140, 49, 198, 24, 99, 12, 33, 196, 24, 99, 102, 102, 134, 70, 146, 4
 ]), 0, 6)[1];
 
 // default match length table
-const dmlt = /*#__PURE__*/ rfse(/*#__PURE__*/ new u8([
+const dmlt = /*#__PURE__*/ rfse(/*#__PURE__*/ new Uint8Array([
   33, 20, 196, 24, 99, 140, 33, 132, 16, 66, 8, 33, 132, 16, 66, 8, 33, 68, 68, 68, 68, 68, 68, 68, 68, 36, 9
 ]), 0, 6)[1];
 
 // default offset code table
-const doct = /*#__PURE__ */ rfse(/*#__PURE__*/ new u8([
+const doct = /*#__PURE__ */ rfse(/*#__PURE__*/ new Uint8Array([
   32, 132, 16, 66, 102, 70, 68, 68, 68, 68, 36, 73, 2
 ]), 0, 5)[1];
 
 // bits to baseline
 const b2bl = (b: Uint8Array, s: number) => {
-  const len = b.length, bl = new i32(len);
+  const len = b.length, bl = new Int32Array(len);
   for (let i = 0; i < len; ++i) {
     bl[i] = s;
     s += 1 << b[i];
@@ -393,7 +390,7 @@ const b2bl = (b: Uint8Array, s: number) => {
 }
 
 // literal length bits
-const llb = /*#__PURE__ */ new u8((/*#__PURE__ */ new i32([
+const llb = /*#__PURE__ */ new Uint8Array((/*#__PURE__ */ new Int32Array([
   0, 0, 0, 0, 16843009, 50528770, 134678020, 202050057, 269422093
 ])).buffer, 0, 36);
 
@@ -401,7 +398,7 @@ const llb = /*#__PURE__ */ new u8((/*#__PURE__ */ new i32([
 const llbl = /*#__PURE__ */ b2bl(llb, 0);
 
 // match length bits
-const mlb = /*#__PURE__ */ new u8((/*#__PURE__ */ new i32([
+const mlb = /*#__PURE__ */ new Uint8Array((/*#__PURE__ */ new Int32Array([
   0, 0, 0, 0, 0, 0, 0, 0, 16843009, 50528770, 117769220, 185207048, 252579084, 16
 ])).buffer, 0, 53);
 
@@ -450,7 +447,7 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
       fill(out, dat[bt], st.y, st.y += sz);
       return out;
     }
-    return fill(new u8(sz), dat[bt]);
+    return fill(new Uint8Array(sz), dat[bt]);
   }
   if (ebt > dat.length) return;
   if (btype == 0) {
@@ -478,7 +475,7 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
     }
     ++bt;
     // add literals to end - can never overlap with backreferences because unused literals always appended
-    let buf = out ? out.subarray(st.y, st.y + st.m) : new u8(st.m);
+    let buf = out ? out.subarray(st.y, st.y + st.m) : new Uint8Array(st.m);
     // starting point for literals
     let spl = buf.length - lss;
     if (lbt == 0) buf.set(dat.subarray(bt, bt += lss), spl);
@@ -508,11 +505,11 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
         const md = (scm >> ((i << 1) + 2)) & 3;
         if (md == 1) {
           // rle buf
-          const rbuf = new u8([0, 0, dat[bt++]]);
+          const rbuf = new Uint8Array([0, 0, dat[bt++]]);
           dts[i] = {
             s: rbuf.subarray(2, 3),
             n: rbuf.subarray(0, 1),
-            t: new u16(rbuf.buffer, 0, 1),
+            t: new Uint16Array(rbuf.buffer, 0, 1),
             b: 0
           };
         } else if (md == 2) {
@@ -613,7 +610,7 @@ const rzb = (dat: Uint8Array, st: DZstdState, out?: Uint8Array) => {
 // concat
 const cct = (bufs: Uint8Array[], ol: number) => {
   if (bufs.length == 1) return bufs[0];
-  const buf = new u8(ol);
+  const buf = new Uint8Array(ol);
   for (let i = 0, b = 0; i < bufs.length; ++i) {
     const chk = bufs[i];
     buf.set(chk, b);
