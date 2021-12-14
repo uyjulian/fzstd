@@ -498,7 +498,20 @@ const dhu = (dat: Uint8Array, out: Uint8Array, hu: HDT) => {
   let i = -1;
   while (pos > eb && i < ss) {
     const cbt = pos >> 3;
-    const val = (dat[cbt] | (dat[cbt + 1] << 8) | (dat[cbt + 2] << 16)) >> (pos & 7);
+    var val = 0;
+    if (cbt < dat.length)
+    {
+      val |= dat[cbt];
+    }
+    if (cbt + 1 < dat.length)
+    {
+      val |= dat[cbt + 1] << 8;
+    }
+    if (cbt + 2 < dat.length)
+    {
+      val |= dat[cbt + 2] << 16;
+    }
+    val >>= pos & 7;
     st = ((st << btr) | val) & msk;
     i += 1;
     out[i] = hu.s[st];
